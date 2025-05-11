@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mermaid Diagram Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            overflow: hidden;
+            display: flex;
+            height: 100vh;
+        }
+        .sidebar {
+            width: 400px;
+            background: white;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            transition: margin-left 0.3s ease;
+        }
+        .sidebar.collapsed {
+            margin-left: -400px;
+        }
+        .sidebar-header {
+            padding: 10px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .sidebar-content {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+        }
+        .config-section {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        .config-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        .config-select {
+            flex: 1;
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .config-buttons {
+            display: flex;
+            gap: 5px;
+        }
+        .config-button {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .config-button:hover {
+            background: #f8f9fa;
+        }
+        .editor-label {
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        .code-editor {
+            flex: 1;
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            resize: none;
+            overflow: auto;
+        }
+        .update-button {
+            margin-top: 10px;
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .update-button:hover {
+            background: #0056b3;
+        }
+        .toggle-sidebar {
+            position: fixed;
+            left: 400px;
+            top: 20px;
+            width: 30px;
+            height: 30px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 0 4px 4px 0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: left 0.3s ease;
+        }
+        .toggle-sidebar.collapsed {
+            left: 0;
+        }
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin: 20px 0 10px;
+        }
+        .instructions {
+            text-align: center;
+            color: #666;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .diagram-wrapper {
+            flex: 1;
+            overflow: auto;
+            background-color: white;
+            margin: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            cursor: grab;
+            position: relative;
+        }
+        .diagram-wrapper.panning {
+            cursor: grabbing;
+        }
+        .diagram-container {
+            transform-origin: 0 0;
+            transition: none;
+            padding: 20px;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            position: absolute;
+            min-width: 100%;
+            min-height: 100%;
+        }
+        .zoom-info {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1000;
+            font-weight: bold;
+        }
+        .error-message {
+            color: red;
+            padding: 10px;
+            margin-top: 10px;
+            border: 1px solid red;
+            border-radius: 4px;
+            background: #ffeeee;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h3>Mermaid Diagram Viewer</h3>
+        </div>
+        <div class="sidebar-content">
+            <div class="config-section">
+                <div class="editor-label">Configuration:</div>
+                <div class="config-controls">
+                    <select id="config-select" class="config-select">
+                        <option value="default">Default Configuration</option>
+                    </select>
+                </div>
+                <div class="config-buttons">
+                    <button id="new-config" class="config-button">New Config</button>
+                    <button id="rename-config" class="config-button">Rename</button>
+                    <button id="delete-config" class="config-button">Delete</button>
+                </div>
+            </div>
+            <div class="editor-label">Edit Diagram Data:</div>
+            <textarea id="diagram-code" class="code-editor" spellcheck="false"></textarea>
+            <button id="update-diagram" class="update-button">Update Diagram</button>
+            <div id="error-message" class="error-message"></div>
+        </div>
+    </div>
+    
+    <button class="toggle-sidebar" id="toggle-sidebar">◀</button>
+    
+    <div class="main-content">
+        <h1>Database Class Diagram</h1>
+        <div class="instructions">
+            Use mouse wheel to zoom | Hold spacebar and drag to pan | Edit the diagram on the left
+        </div>
+        <div class="zoom-info">Zoom: <span id="zoom-level">100%</span></div>
+        
+        <div class="diagram-wrapper" id="diagram-wrapper">
+            <div class="diagram-container" id="diagram-container">
+                <div id="mermaid-diagram" class="mermaid"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Default configuration
+        const defaultDiagramCode = `erDiagram
+    ISSUER {
+        integer issuerid PK
+        varchar globalidentifier
+        varchar name
+        varchar shortname
+        integer domicileid
+        text comments
+        date effectivedate
+        boolean isactive
+        integer createdby
+        timestamp createddate
+        timestamp modifieddate
+        integer modifiedby
+    }
+    
+    INSTRUMENT {
+        integer instrumentid PK
+        bigint issuerid FK
+        integer instrumenttypeid
+        integer instrumentsubtypeid
+        varchar instrumentname
+        varchar instrumentshortname
+        varchar instrumentfullname
+        integer valornumber
+        varchar isin
+        date validfrom
+        date validto
+        boolean isactive
+        integer createdby
+        timestamp createddate
+        integer modifiedby
+        timestamp modifieddate
+        varchar description
+    }
+    
+    LISTING {
+        integer listingid PK
+        bigint instrumentid FK
+        integer marketid
+        integer currencyid
+        varchar symbol
+        varchar listingtype
+        date listingvalidfrom
+        date listingvalidto
+        boolean isactive
+        integer createdby
+        timestamp createddate
+        integer modifiedby
+        timestamp modifieddate
+        varchar symbolsuffix
+    }
+    
+    EQUITY {
+        integer equityid PK
+        bigint instrumentid FK
+        varchar classofshare
+        numeric votepershare
+        text comments
+        boolean isactive
+        integer createdby
+        timestamp createddate
+        integer modifiedby
+        timestamp modifieddate
+    }
+    
+    BASKET {
+        integer basketid PK
+        varchar basketname
+        varchar baskettype
+        varchar longname
+        varchar comment
+        boolean isvalid
+        boolean isactive
+        integer createdby
+        timestamp createddate
+        timestamp modifieddate
+        integer modifiedby
+    }
+    
+    BASKETCOMBINATION {
+        integer basketcombinationid PK
+        integer parentbasketid
+        integer childbasketid
+        date fromdate
+        date enddate
+        boolean isactive
+        integer createdby
+        timestamp createddate
+        timestamp modifieddate
+        integer modifiedby
+    }
+    
+    BASKETMEMBER {
+        integer basketmemberid PK
+        integer basketid
+        integer listingid
+        date fromdate
+        date enddate
+        boolean isactive
+        integer createdby
+        timestamp createddate
+        timestamp modifieddate
+        integer modifiedby
+        boolean isvalid
+    }
+    
+    EXCLUDEDBASKETMEMBER {
+        integer exclbasketmemberid PK
+        integer basketid
+        integer listingid
+        date fromdate
+        date enddate
+        boolean isactive
+        integer createdby
+        timestamp createddate
+        timestamp modifieddate
+        integer modifiedby
+        boolean isvalid
+    }
+    
+    INDEXINSTRUMENT {
+        integer indexinstrumentid PK
+        integer instrumentid FK
+        integer populationid FK
+        integer basketid
+        integer sectorfilterid
+        integer parentindexid
+        integer totalreturnid FK
+        varchar indextypecode
+        varchar indexpricetype
+        varchar disseminationpricetype
+        integer substitutionruleid FK
+        integer indexcompositionfilterid
+        smallint incldepositright
+        smallint incltotalnumberofshare
+        integer weightruleid FK
+        numeric weightcap
+        smallint intradaycalculation
+        integer calculationfrequency
+        integer publishfrequency
+        smallint isproduction
+        varchar indextype
+        boolean isfreefloat
+        boolean usemostliquid
+        boolean onlyinclparentins
+        boolean isactive
+        integer createdby
+        timestamp createddate
+        timestamp modifieddate
+        integer modifiedby
+    }
+    
+    INDEXMETHOD {
+        integer indexmethodid PK
+        date indexmethoddate
+        integer indexmethodtypeid FK
+        numeric correctionvalue
+        varchar description
+        date enddate
+        integer listingid
+        boolean isactive
+        integer createdby
+        timestamp createddate
+        timestamp modifieddate
+        integer modifiedby
+        boolean isvalid
+    }
+    
+    INDEXMETHODTYPE {
+        integer indexmethodtypeid PK
+        smallint usecorrectionvalue
+        smallint useenddate
+        varchar name
+        varchar description
+        boolean isactive
+        integer createdby
+        timestamp createddate
+        timestamp modifieddate
+        integer modifiedby
+    }
+    
+    POPULATION {
+        integer populationid PK
+        varchar name
+        smallint automaticupdate
+        varchar description
+        boolean isactive
+        integer createdby
+        timestamp createddate
+        timestamp modifieddate
+        integer modifiedby
+        boolean isproduction
+    }
+    
+    POPULATIONDETAIL {
+        integer populationdetailid PK
+        integer populationid
+        integer listingid
+        date fromdate
+        date enddate
+        bigint sodnumberofshare
+        bigint eodnumberofshare
+        numeric weightfactor
+        boolean isactive
+        integer createdby
+        timestamp createddate
+        timestamp modifieddate
+        integer modifiedby
+        boolean isvalid
+        double populationfreefloat
+    }
+    
+    SUBSTITUTIONRULE {
+        integer substitutionruleid PK
+        varchar name
+        varchar description
+    }
+    
+    TOTALRETURN {
+        integer totalreturnid PK
+        varchar name
+        varchar description
+    }
+    
+    WEIGHTRULE {
+        integer weightruleid PK
+        varchar name
+        varchar description
+    }
+    
+    PANDQ_INDEXCALCVALUE {
+        bigint indexid PK
+        bigint instrumentid PK
+        bigint listingid PK
+        integer notperiod PK
+        date ic_date PK
+        double quotevalue_eod
+        double quotevalue_sod
+        numeric noofshare_eod
+        numeric noofshare_sod
+        smallint calcmethodstepone
+        smallint calcmethodsteptwo
+        char corrmethod
+        double marketcapday_eod
+        double marketcapday_sod
+        double fixvaluestepone_eod
+        double fixvaluesteptwo_eod
+        double fixvaluestepone_sod
+        double fixvaluesteptwo_sod
+        double dividend
+        double adjustment
+        numeric marketcapused_sod
+    }
+    
+    ISSUER ||--o{ INSTRUMENT : has
+    INSTRUMENT ||--o{ LISTING : has
+    INSTRUMENT ||--o{ EQUITY : has
+    INSTRUMENT ||--o{ INDEXINSTRUMENT : has
+    POPULATION ||--o{ INDEXINSTRUMENT : has
+    TOTALRETURN ||--o{ INDEXINSTRUMENT : has
+    SUBSTITUTIONRULE ||--o{ INDEXINSTRUMENT : has
+    WEIGHTRULE ||--o{ INDEXINSTRUMENT : has
+    INDEXMETHODTYPE ||--o{ INDEXMETHOD : has
+    LISTING ||--o{ INDEXMETHOD : has
+    
+    BASKET ||..o{ BASKETCOMBINATION : parent
+    BASKET ||..o{ BASKETCOMBINATION : child
+    BASKET ||..o{ BASKETMEMBER : has
+    LISTING ||..o{ BASKETMEMBER : has
+    BASKET ||..o{ EXCLUDEDBASKETMEMBER : has
+    LISTING ||..o{ EXCLUDEDBASKETMEMBER : has
+    BASKET ||..o{ INDEXINSTRUMENT : has
+    INDEXINSTRUMENT ||..o{ INDEXINSTRUMENT : parent
+    POPULATION ||..o{ POPULATIONDETAIL : has
+    LISTING ||..o{ POPULATIONDETAIL : has
+    INDEXINSTRUMENT ||..o{ PANDQ_INDEXCALCVALUE : indexid
+    INSTRUMENT ||..o{ PANDQ_INDEXCALCVALUE : instrumentid
+    LISTING ||..o{ PANDQ_INDEXCALCVALUE : listingid`;
+
+        // Initialize mermaid
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#fff',
+                primaryTextColor: '#000',
+                primaryBorderColor: '#000',
+                lineColor: '#333'
+            },
+            er: {
+                layoutDirection: 'TB',
+                minEntityWidth: 100,
+                minEntityHeight: 75,
+                entityPadding: 15,
+                useMaxWidth: true
+            }
+        });
+        
+        // Get DOM elements
+        const sidebar = document.getElementById('sidebar');
+        const toggleButton = document.getElementById('toggle-sidebar');
+        const diagramCode = document.getElementById('diagram-code');
+        const updateButton = document.getElementById('update-diagram');
+        const errorMessage = document.getElementById('error-message');
+        const mermaidDiagram = document.getElementById('mermaid-diagram');
+        const wrapper = document.getElementById('diagram-wrapper');
+        const container = document.getElementById('diagram-container');
+        const zoomLevelDisplay = document.getElementById('zoom-level');
+        const configSelect = document.getElementById('config-select');
+        const newConfigButton = document.getElementById('new-config');
+        const renameConfigButton = document.getElementById('rename-config');
+        const deleteConfigButton = document.getElementById('delete-config');
+        
+        // Configuration management
+        let configurations = {};
+        let currentConfig = 'default';
+        
+        // Load configurations from localStorage
+        function loadConfigurations() {
+            const saved = localStorage.getItem('diagramConfigurations');
+            if (saved) {
+                configurations = JSON.parse(saved);
+            } else {
+                configurations = {
+                    'default': defaultDiagramCode
+                };
+                saveConfigurations();
+            }
+            updateConfigSelect();
+            loadCurrentConfig();
+        }
+        
+        // Save configurations to localStorage
+        function saveConfigurations() {
+            localStorage.setItem('diagramConfigurations', JSON.stringify(configurations));
+        }
+        
+        // Update configuration select options
+        function updateConfigSelect() {
+            configSelect.innerHTML = '';
+            Object.keys(configurations).forEach(key => {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = key === 'default' ? 'Default Configuration' : key;
+                configSelect.appendChild(option);
+            });
+            configSelect.value = currentConfig;
+        }
+        
+        // Load current configuration
+        function loadCurrentConfig() {
+            diagramCode.value = configurations[currentConfig] || defaultDiagramCode;
+            updateDiagram();
+        }
+        
+        // Save current configuration
+        function saveCurrentConfig() {
+            configurations[currentConfig] = diagramCode.value;
+            saveConfigurations();
+        }
+        
+        // Configuration select change
+        configSelect.addEventListener('change', () => {
+            saveCurrentConfig();
+            currentConfig = configSelect.value;
+            loadCurrentConfig();
+        });
+        
+        // New configuration
+        newConfigButton.addEventListener('click', () => {
+            const name = prompt('Enter name for new configuration:');
+            if (name && name.trim() && !configurations[name]) {
+                configurations[name] = diagramCode.value;
+                saveConfigurations();
+                currentConfig = name;
+                updateConfigSelect();
+            }
+        });
+        
+        // Rename configuration
+        renameConfigButton.addEventListener('click', () => {
+            if (currentConfig === 'default') {
+                alert('Cannot rename default configuration');
+                return;
+            }
+            const newName = prompt('Enter new name:', currentConfig);
+            if (newName && newName.trim() && newName !== currentConfig && !configurations[newName]) {
+                configurations[newName] = configurations[currentConfig];
+                delete configurations[currentConfig];
+                currentConfig = newName;
+                saveConfigurations();
+                updateConfigSelect();
+            }
+        });
+        
+        // Delete configuration
+        deleteConfigButton.addEventListener('click', () => {
+            if (currentConfig === 'default') {
+                alert('Cannot delete default configuration');
+                return;
+            }
+            if (confirm(`Delete configuration "${currentConfig}"?`)) {
+                delete configurations[currentConfig];
+                currentConfig = 'default';
+                saveConfigurations();
+                updateConfigSelect();
+                loadCurrentConfig();
+            }
+        });
+        
+        // Toggle sidebar
+        toggleButton.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+            toggleButton.classList.toggle('collapsed');
+            toggleButton.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+        });
+        
+        // Update diagram function
+        async function updateDiagram() {
+            const code = diagramCode.value;
+            try {
+                // Clear previous diagram
+                mermaidDiagram.textContent = code;
+                mermaidDiagram.removeAttribute('data-processed');
+                
+                // Render new diagram
+                await mermaid.run();
+                
+                // Reset zoom
+                currentScale = 1;
+                offsetX = 0;
+                offsetY = 0;
+                applyTransform();
+                updateZoomLevel();
+                
+                // Hide error message
+                errorMessage.style.display = 'none';
+            } catch (error) {
+                errorMessage.textContent = 'Error parsing diagram: ' + error.message;
+                errorMessage.style.display = 'block';
+            }
+        }
+        
+        // Update button click
+        updateButton.addEventListener('click', () => {
+            updateDiagram();
+            saveCurrentConfig();
+        });
+        
+        // Zoom and pan functionality
+        let currentScale = 1;
+        let offsetX = 0;
+        let offsetY = 0;
+        const minScale = 0.1;
+        const maxScale = 5;
+        const scaleStep = 0.1;
+        
+        // Update zoom level display
+        function updateZoomLevel() {
+            zoomLevelDisplay.textContent = Math.round(currentScale * 100) + '%';
+        }
+        
+        // Apply transform
+        function applyTransform() {
+            container.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${currentScale})`;
+        }
+        
+        // Zoom functions
+        function zoom(delta, mouseX, mouseY) {
+            const oldScale = currentScale;
+            currentScale += delta;
+            currentScale = Math.max(minScale, Math.min(maxScale, currentScale));
+            
+            if (currentScale !== oldScale) {
+                // Calculate the position relative to the container
+                const rect = wrapper.getBoundingClientRect();
+                const x = mouseX - rect.left;
+                const y = mouseY - rect.top;
+                
+                // Adjust offset to zoom towards mouse position
+                const scaleDelta = currentScale - oldScale;
+                offsetX -= (x - offsetX) * (scaleDelta / oldScale);
+                offsetY -= (y - offsetY) * (scaleDelta / oldScale);
+                
+                applyTransform();
+                updateZoomLevel();
+            }
+        }
+        
+        // Mouse wheel zoom
+        wrapper.addEventListener('wheel', (e) => {
+            if (e.ctrlKey || e.metaKey || e.shiftKey) {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -scaleStep : scaleStep;
+                zoom(delta, e.clientX, e.clientY);
+            }
+        });
+        
+        // Prevent text selection when dragging
+        wrapper.addEventListener('selectstart', (e) => {
+            e.preventDefault();
+        });
+        
+        // Panning with spacebar
+        let isPanning = false;
+        let startX, startY, startOffsetX, startOffsetY;
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !isPanning && e.target !== diagramCode) {
+                e.preventDefault();
+                isPanning = true;
+                wrapper.classList.add('panning');
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                isPanning = false;
+                wrapper.classList.remove('panning');
+            }
+        });
+        
+        // Prevent spacebar scrolling behavior
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && e.target === document.body) {
+                e.preventDefault();
+            }
+        });
+        
+        wrapper.addEventListener('mousedown', (e) => {
+            if (isPanning) {
+                e.preventDefault();
+                startX = e.clientX;
+                startY = e.clientY;
+                startOffsetX = offsetX;
+                startOffsetY = offsetY;
+            }
+        });
+        
+        wrapper.addEventListener('mousemove', (e) => {
+            if (isPanning && startX !== undefined) {
+                e.preventDefault();
+                const deltaX = e.clientX - startX;
+                const deltaY = e.clientY - startY;
+                offsetX = startOffsetX + deltaX;
+                offsetY = startOffsetY + deltaY;
+                applyTransform();
+            }
+        });
+        
+        wrapper.addEventListener('mouseup', () => {
+            startX = startY = undefined;
+        });
+        
+        wrapper.addEventListener('mouseleave', () => {
+            startX = startY = undefined;
+        });
+        
+        // Initialize
+        loadConfigurations();
+    </script>
+</body>
+</html>
